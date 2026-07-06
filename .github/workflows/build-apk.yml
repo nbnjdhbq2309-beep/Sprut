@@ -1,5 +1,7 @@
 name: Build Android APK
 
+# Запускается автоматически при пуше в main/master,
+# а также вручную кнопкой "Run workflow" во вкладке Actions на GitHub.
 on:
   push:
     branches: [main, master]
@@ -35,8 +37,33 @@ jobs:
       - name: Генерация Android-проекта (npx cap add android)
         run: npx cap add android
 
+      - name: "[ДИАГНОСТИКА] Состояние ДО патча"
+        run: |
+          echo "--- capacitor.config.json ---"
+          cat capacitor.config.json
+          echo ""
+          echo "--- appId в сгенерированном build.gradle ---"
+          grep -r "applicationId" android/app/build.gradle || true
+          echo ""
+          echo "--- все файлы MainActivity.* в проекте ---"
+          find android/app/src/main/java -iname "MainActivity*"
+          echo ""
+          echo "--- package в AndroidManifest.xml ---"
+          grep -o 'package="[^"]*"' android/app/src/main/AndroidManifest.xml || echo "(атрибут package не найден — это нормально для новых AGP, applicationId берётся из build.gradle)"
+
       - name: Внедрение нативного кода записи (foreground service)
         run: node scripts/apply-native-patch.js
+
+      - name: "[ДИАГНОСТИКА] Состояние ПОСЛЕ патча"
+        run: |
+          echo "--- все файлы MainActivity.* после патча ---"
+          find android/app/src/main/java -iname "MainActivity*"
+          echo ""
+          echo "--- содержимое MainActivity после патча ---"
+          find android/app/src/main/java -iname "MainActivity*" -exec cat {} \;
+          echo ""
+          echo "--- полное дерево java-файлов проекта ---"
+          find android/app/src/main/java -type f
 
       - name: Синхронизация Capacitor
         run: npx cap sync android
@@ -47,6 +74,27 @@ jobs:
       - name: Сборка debug APK
         working-directory: android
         run: ./gradlew assembleDebug
+
+      - name: "[ДИАГНОСТИКА] Реальный манифест внутри готового APK"
+        run: |
+          AAPT=$(find $ANDROID_HOME -name "aapt" -type f | head -1)
+          echo "Использую aapt: $AAPT"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          echo "--- applicationId и launcher activity из готового APK ---"
+          "$AAPT" dump badging "$APK" | grep -E "package:|launchable-activity"
+
+      - name: Проверка — плагин реально попал в собранный APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p /tmp/apk-check
+          cd /tmp/apk-check
+          unzip -o "$GITHUB_WORKSPACE/$APK" "classes*.dex" > /dev/null
+          if strings classes*.dex | grep -q "MeetingRecorderPlugin"; then
+            echo "OK: MeetingRecorderPlugin найден внутри собранного APK."
+          else
+            echo "ОШИБКА: MeetingRecorderPlugin НЕ найден внутри APK — сборка бракованная."
+            exit 1
+          fi
 
       - name: Загрузка готового APK как артефакт
         uses: actions/upload-artifact@v4
