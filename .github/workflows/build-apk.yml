@@ -1,0 +1,55 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Установка Java (нужна для Gradle/Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Установка Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: npm install
+        run: npm install
+
+      - name: Установка Capacitor Filesystem plugin
+        run: npm install @capacitor/filesystem
+
+      - name: Генерация Android-проекта (npx cap add android)
+        run: npx cap add android
+
+      - name: Внедрение нативного кода записи (foreground service)
+        run: node scripts/apply-native-patch.js
+
+      - name: Синхронизация Capacitor
+        run: npx cap sync android
+
+      - name: Права на выполнение gradlew
+        run: chmod +x android/gradlew
+
+      - name: Сборка debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Загрузка готового APK как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprut-meeting-recorder-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
