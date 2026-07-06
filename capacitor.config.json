@@ -3,9 +3,7 @@
   "appName": "Sprut Meeting Recorder",
   "webDir": "www",
   "server": {
+    "url": "https://ononeon.com/meeting.php",
     "androidScheme": "https"
-  },
-  "android": {
-    "allowMixedContent": false
   }
 }
