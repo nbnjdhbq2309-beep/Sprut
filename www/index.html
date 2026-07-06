@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#26372d">
+  <title>Запись встречи</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- capacitor.js подключается автоматически Capacitor CLI при `cap sync`, добавляет window.Capacitor -->
+  <style>
+    :root {
+      --bg: #f6efe3;
+      --text: #35281e;
+      --muted: #8f7a64;
+      --line: rgba(199,145,90,0.18);
+      --shadow: 0 26px 70px rgba(100, 68, 24, 0.14);
+      --accent: #c97228;
+      --accent-strong: #bc6724;
+      --danger: #b75b47;
+      --success: #2f7a4d;
+      --surface: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(251,247,239,0.96));
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Manrope", sans-serif;
+      background: linear-gradient(180deg, #fbf7ef 0%, #f6efe3 45%, #efe5d4 100%);
+    }
+    .shell { width: min(100%, 760px); margin: 0 auto; padding: 28px 18px 40px; }
+    .card {
+      border: 1px solid rgba(199,145,90,0.1);
+      border-radius: 30px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 22px; margin-bottom: 18px; }
+    .header-badge {
+      display: inline-flex; align-items: center; min-height: 46px; padding: 0 18px;
+      color: #9b8165; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; font-weight: 800;
+      background: rgba(255,255,255,0.94); border: 1px solid rgba(199,145,90,0.14); border-radius: 999px;
+    }
+    .main { padding: 24px; }
+    .eyebrow { margin: 0 0 10px; color: #9b7759; text-transform: uppercase; letter-spacing: .18em; font-size: .78rem; font-weight: 700; }
+    h1 { margin: 0; font-size: clamp(1.55rem, 5vw, 2.35rem); line-height: 1.06; letter-spacing: -.05em; }
+    .meeting-panel { margin-top: 24px; padding: 22px; border-radius: 26px; border: 1px solid rgba(199,145,90,0.12); background: rgba(255, 252, 246, 0.78); }
+    .status-badge {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 120px; min-height: 52px; padding: 0 18px;
+      border-radius: 999px; border: 1px solid rgba(199,145,90,0.14); background: rgba(255,255,255,0.86); color: #5c4939; font-weight: 800; font-size: 1.15rem;
+    }
+    .status-badge.is-recording { color: #fffdf9; background: linear-gradient(135deg, #bc6724 0%, #cf7a2e 58%, #df994d 100%); }
+    .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .action-start { grid-column: 1; grid-row: 1 / span 2; }
+    .action-stop { grid-column: 2; grid-row: 1; }
+    .action-pause { grid-column: 2; grid-row: 2; }
+    button { min-height: 58px; padding: 16px 20px; border: none; border-radius: 18px; font: inherit; font-weight: 800; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.5; }
+    .primary-btn { color: #fffdf9; background: linear-gradient(135deg, #bc6724 0%, #cf7a2e 58%, #df994d 100%); }
+    .primary-btn.is-idle { color: #654630; background: rgba(255,250,242,0.96); border: 1px solid rgba(199,145,90,0.18); }
+    .secondary-btn { color: #654630; background: rgba(255,250,242,0.96); border: 1px solid rgba(199,145,90,0.18); }
+    .secondary-btn.is-danger { color: #fffdf9; background: linear-gradient(135deg, #a85643 0%, #bf6a55 100%); }
+    .danger-btn { color: #fffdf9; background: linear-gradient(135deg, #a85643 0%, #bf6a55 100%); }
+    .message { margin-top: 18px; padding: 16px 18px; border-radius: 18px; border: 1px solid rgba(199,145,90,0.12); background: rgba(255, 252, 246, 0.78); color: var(--muted); line-height: 1.65; }
+    .message.is-error { color: #9e4739; border-color: rgba(183, 91, 71, 0.22); background: rgba(255, 241, 238, 0.84); }
+    .message.is-success { color: var(--success); border-color: rgba(47,122,77,0.22); background: rgba(239, 252, 244, 0.84); }
+    .message.is-warning { color: #8b5d1f; border-color: rgba(201,114,40,0.22); background: rgba(255, 247, 233, 0.84); }
+    .file-note { margin-top: 16px; color: #5c4939; font-weight: 700; line-height: 1.6; }
+    .file-subnote { margin-top: 6px; color: var(--muted); line-height: 1.6; }
+    audio { width: 100%; margin-top: 16px; }
+    .confirm-backdrop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(43, 33, 25, 0.38); z-index: 20; }
+    .confirm-backdrop[hidden] { display: none; }
+    .confirm-card { width: min(100%, 420px); padding: 24px; border-radius: 26px; border: 1px solid rgba(199,145,90,0.12); background: rgba(255,255,255,0.98); }
+    .confirm-card h2 { margin: 0; font-size: 1.45rem; }
+    .confirm-card p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; }
+    .confirm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    @media (max-width: 640px) {
+      .shell { padding: 20px 12px 32px; }
+      .actions, .confirm-actions { grid-template-columns: 1fr; }
+      .action-start, .action-stop, .action-pause { grid-column: auto; grid-row: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="card header">
+      <div class="header-badge">UNIQ Development · модуль AI оценки</div>
+    </header>
+
+    <main class="card main">
+      <p class="eyebrow">Запись встречи</p>
+      <h1>Автоматическая запись и анализ встреч</h1>
+
+      <section class="meeting-panel">
+        <div id="meeting-timer" class="status-badge">00:00</div>
+
+        <div class="actions">
+          <button id="meeting-start-btn" type="button" class="primary-btn action-start">Начать встречу</button>
+          <button id="meeting-stop-btn" type="button" class="secondary-btn action-stop" disabled>Закончить встречу</button>
+          <button id="meeting-pause-btn" type="button" class="secondary-btn action-pause" disabled>Пауза</button>
+        </div>
+
+        <div id="meeting-status" class="message">Проверяю наличие чек-листа <strong>ВСТРЕЧА</strong> и готовность страницы к записи.</div>
+        <div id="meeting-file-note" class="file-note">Запись еще не создана.</div>
+        <div id="meeting-file-subnote" class="file-subnote">После остановки встречи система сама отправит запись на распознавание и оценку.</div>
+        <audio id="meeting-audio" controls hidden></audio>
+      </section>
+    </main>
+  </div>
+
+  <div id="confirm-modal" class="confirm-backdrop" hidden>
+    <div class="confirm-card">
+      <h2>Закончить встречу?</h2>
+      <p>После подтверждения запись будет сохранена и автоматически отправлена на анализ по чек-листу <strong>ВСТРЕЧА</strong>.</p>
+      <div class="confirm-actions">
+        <button id="confirm-yes-btn" type="button" class="primary-btn">Да</button>
+        <button id="confirm-no-btn" type="button" class="secondary-btn">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause-modal" class="confirm-backdrop" hidden>
+    <div class="confirm-card">
+      <h2>Запись на паузе</h2>
+      <p>Выберите действие: продолжить встречу или полностью сбросить текущую запись.</p>
+      <div class="confirm-actions">
+        <button id="pause-continue-btn" type="button" class="primary-btn">Продолжить встречу</button>
+        <button id="pause-reset-btn" type="button" class="secondary-btn">Сбросить запись</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="reset-confirm-modal" class="confirm-backdrop" hidden>
+    <div class="confirm-card">
+      <h2>Сбросить запись?</h2>
+      <p>Вы уверены, что хотите полностью удалить текущую запись встречи?</p>
+      <div class="confirm-actions">
+        <button id="reset-confirm-yes-btn" type="button" class="danger-btn">Да</button>
+        <button id="reset-confirm-no-btn" type="button" class="secondary-btn">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CHECKLIST_NAME = "ВСТРЕЧА";
+
+    // ---- Мост к нативному Android-плагину (Capacitor) ----
+    // MeetingRecorder реализован в android/app/.../MeetingRecorderPlugin.kt
+    // Он пишет звук через foreground service — запись не прерывается при
+    // блокировке экрана или сворачивании приложения.
+    function getRecorderPlugin() {
+      return window.Capacitor?.Plugins?.MeetingRecorder || null;
+    }
+    function getFilesystemPlugin() {
+      return window.Capacitor?.Plugins?.Filesystem || null;
+    }
+
+    const elements = {
+      startBtn: document.getElementById("meeting-start-btn"),
+      stopBtn: document.getElementById("meeting-stop-btn"),
+      pauseBtn: document.getElementById("meeting-pause-btn"),
+      timer: document.getElementById("meeting-timer"),
+      status: document.getElementById("meeting-status"),
+      fileNote: document.getElementById("meeting-file-note"),
+      fileSubnote: document.getElementById("meeting-file-subnote"),
+      audio: document.getElementById("meeting-audio"),
+      confirmModal: document.getElementById("confirm-modal"),
+      confirmYesBtn: document.getElementById("confirm-yes-btn"),
+      confirmNoBtn: document.getElementById("confirm-no-btn"),
+      pauseModal: document.getElementById("pause-modal"),
+      pauseContinueBtn: document.getElementById("pause-continue-btn"),
+      pauseResetBtn: document.getElementById("pause-reset-btn"),
+      resetConfirmModal: document.getElementById("reset-confirm-modal"),
+      resetConfirmYesBtn: document.getElementById("reset-confirm-yes-btn"),
+      resetConfirmNoBtn: document.getElementById("reset-confirm-no-btn")
+    };
+
+    const state = {
+      checklistId: null,
+      checklistLabel: CHECKLIST_NAME,
+      isRecording: false,
+      isPaused: false,
+      file: null,
+      audioUrl: "",
+      nativePath: "",
+      timerId: null,
+      startedAt: 0,
+      elapsedMs: 0,
+      isSubmitting: false,
+      shouldSubmitAfterStop: false
+    };
+
+    function normalizeName(value) {
+      return String(value || "").trim().toLocaleLowerCase("ru-RU");
+    }
+
+    function setStatus(message, tone = "") {
+      elements.status.innerHTML = message;
+      elements.status.className = tone ? `message ${tone}` : "message";
+    }
+
+    function formatDuration(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+      const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, "0");
+      return `${minutes}:${seconds}`;
+    }
+
+    function updateTimerText() {
+      const liveMs = state.startedAt ? Date.now() - state.startedAt : 0;
+      const totalSeconds = Math.floor((state.elapsedMs + liveMs) / 1000);
+      elements.timer.textContent = formatDuration(totalSeconds);
+    }
+
+    function stopTimer(commitElapsed = false) {
+      if (commitElapsed && state.startedAt) {
+        state.elapsedMs += Date.now() - state.startedAt;
+      }
+      state.startedAt = 0;
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+      elements.timer.classList.remove("is-recording");
+    }
+
+    function startTimer(reset = false) {
+      if (reset) {
+        state.elapsedMs = 0;
+        elements.timer.textContent = "00:00";
+      }
+      state.startedAt = Date.now();
+      updateTimerText();
+      elements.timer.classList.add("is-recording");
+      state.timerId = window.setInterval(updateTimerText, 1000);
+    }
+
+    function resetRecordedMeeting(options = {}) {
+      const { keepStatus = false } = options;
+      stopTimer();
+      state.isRecording = false;
+      state.isPaused = false;
+      state.file = null;
+      state.nativePath = "";
+      state.shouldSubmitAfterStop = false;
+      state.elapsedMs = 0;
+      if (state.audioUrl) {
+        URL.revokeObjectURL(state.audioUrl);
+        state.audioUrl = "";
+      }
+      elements.confirmModal.hidden = true;
+      elements.pauseModal.hidden = true;
+      elements.resetConfirmModal.hidden = true;
+      elements.timer.textContent = "00:00";
+      elements.audio.hidden = true;
+      elements.audio.removeAttribute("src");
+      elements.audio.load();
+      elements.fileNote.textContent = "Запись еще не создана.";
+      elements.fileSubnote.textContent = "После остановки встречи система сама отправит запись на распознавание и оценку.";
+      if (!keepStatus) {
+        if (state.checklistId) {
+          setStatus(`Чек-лист <strong>${state.checklistLabel}</strong> найден. Можно начинать запись.`, "is-success");
+        } else {
+          setStatus(`Не найден чек-лист <strong>${CHECKLIST_NAME}</strong>. Сначала создайте его в основном кабинете.`, "is-warning");
+        }
+      }
+      syncButtons();
+    }
+
+    function syncButtons() {
+      const hasChecklist = Boolean(state.checklistId);
+      elements.startBtn.disabled = !hasChecklist || state.isRecording || state.isPaused || state.isSubmitting;
+      elements.stopBtn.disabled = (!state.isRecording && !state.isPaused) || state.isSubmitting;
+      elements.pauseBtn.disabled = !state.isRecording || state.isSubmitting;
+      elements.startBtn.classList.toggle("is-idle", (state.isRecording || state.isPaused) && !state.isSubmitting);
+      elements.stopBtn.classList.toggle("is-danger", (state.isRecording || state.isPaused) && !state.isSubmitting);
+    }
+
+    function applyRecordedMeeting(file, blob) {
+      state.file = file;
+      if (state.audioUrl) {
+        URL.revokeObjectURL(state.audioUrl);
+      }
+      state.audioUrl = URL.createObjectURL(blob);
+      elements.audio.src = state.audioUrl;
+      elements.audio.hidden = false;
+      elements.fileNote.textContent = `Готова запись: ${file.name}`;
+      elements.fileSubnote.textContent = "Запись сохранена локально и будет отправлена на анализ автоматически.";
+      syncButtons();
+    }
+
+    function base64ToBlob(base64, mimeType) {
+      const byteChars = atob(base64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+    }
+
+    async function readNativeFileAsBlob(path) {
+      const Filesystem = getFilesystemPlugin();
+      if (!Filesystem) {
+        throw new Error("Плагин Filesystem недоступен. Проверьте, что @capacitor/filesystem установлен и cap sync выполнен.");
+      }
+      // path — абсолютный путь на диске устройства (externalCacheDir),
+      // читаем как base64 через Filesystem plugin по абсолютному пути.
+      const result = await Filesystem.readFile({ path });
+      return base64ToBlob(result.data, "audio/mp4");
+    }
+
+    function getMicrophoneErrorMessage(error) {
+      const message = String(error?.message || error || "");
+      if (message.toLowerCase().includes("permission")) {
+        return "Не удалось получить доступ к микрофону. Разрешите доступ в настройках приложения и попробуйте снова.";
+      }
+      return `Не удалось начать запись: ${message || "неизвестная ошибка"}.`;
+    }
+
+    async function fetchMeetingChecklist() {
+      const response = await fetch("api.php?action=checklists", {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Не удалось получить чек-листы.");
+      }
+      const checklists = Array.isArray(payload.checklists) ? payload.checklists : [];
+      const meetingChecklist = checklists.find((item) => normalizeName(item.name) === normalizeName(CHECKLIST_NAME));
+      if (!meetingChecklist) {
+        state.checklistId = null;
+        setStatus(`Не найден чек-лист <strong>${CHECKLIST_NAME}</strong>. Сначала создайте его в основном кабинете.`, "is-warning");
+        syncButtons();
+        return;
+      }
+      state.checklistId = meetingChecklist.id;
+      state.checklistLabel = meetingChecklist.name || CHECKLIST_NAME;
+      setStatus(`Чек-лист <strong>${state.checklistLabel}</strong> найден. Можно начинать запись.`, "is-success");
+      syncButtons();
+    }
+
+    async function startMeetingRecording() {
+      if (!state.checklistId) {
+        setStatus(`Не найден чек-лист <strong>${CHECKLIST_NAME}</strong>. Сначала создайте его в основном кабинете.`, "is-warning");
+        return;
+      }
+      const Recorder = getRecorderPlugin();
+      if (!Recorder) {
+        setStatus("Нативный модуль записи не найден. Похоже, страница открыта в обычном браузере, а не в Android-приложении Sprut.", "is-error");
+        return;
+      }
+
+      state.file = null;
+      state.nativePath = "";
+      state.shouldSubmitAfterStop = false;
+      if (state.audioUrl) {
+        URL.revokeObjectURL(state.audioUrl);
+        state.audioUrl = "";
+      }
+      elements.audio.hidden = true;
+      elements.audio.removeAttribute("src");
+      elements.audio.load();
+      elements.fileNote.textContent = "Идет запись встречи...";
+      elements.fileSubnote.textContent = "Когда встреча закончится, нажмите «Закончить встречу». Запись продолжится даже если экран заблокирован.";
+      setStatus("Запись встречи запущена. Идет фиксация аудио с микрофона устройства (работает и при заблокированном экране).", "");
+
+      try {
+        await Recorder.start();
+        state.isRecording = true;
+        state.isPaused = false;
+        startTimer(true);
+        syncButtons();
+      } catch (error) {
+        state.isRecording = false;
+        setStatus(getMicrophoneErrorMessage(error), "is-error");
+        elements.fileNote.textContent = "Запись еще не создана.";
+        elements.fileSubnote.textContent = "Разрешите микрофон и попробуйте снова.";
+        syncButtons();
+      }
+    }
+
+    function requestStopMeeting() {
+      if ((!state.isRecording && !state.isPaused) || state.isSubmitting) {
+        return;
+      }
+      elements.confirmModal.hidden = false;
+    }
+
+    function cancelStopMeeting() {
+      elements.confirmModal.hidden = true;
+    }
+
+    async function confirmStopMeeting() {
+      elements.confirmModal.hidden = true;
+      const Recorder = getRecorderPlugin();
+      if (!Recorder) {
+        return;
+      }
+
+      state.shouldSubmitAfterStop = true;
+      state.isSubmitting = true;
+      elements.stopBtn.disabled = true;
+      elements.startBtn.disabled = true;
+      elements.pauseBtn.disabled = true;
+      elements.fileNote.textContent = "Сохраняю запись встречи...";
+      elements.fileSubnote.textContent = "Подождите пару секунд, затем запись автоматически уйдет на анализ.";
+      setStatus("Встреча завершена. Сохраняю запись и отправляю ее на автоматический анализ.", "");
+
+      stopTimer(true);
+      state.isRecording = false;
+      state.isPaused = false;
+
+      try {
+        const { path, exists, size } = await Recorder.stop();
+        state.nativePath = path;
+
+        if (!exists || !size) {
+          elements.fileNote.textContent = "Запись не получилась. Попробуйте еще раз.";
+          elements.fileSubnote.textContent = "Файл записи оказался пустым.";
+          setStatus("Запись завершилась без аудиоданных. Повторите встречу еще раз.", "is-error");
+          state.isSubmitting = false;
+          syncButtons();
+          return;
+        }
+
+        const blob = await readNativeFileAsBlob(path);
+        const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+        const file = new File([blob], `meeting-${stamp}.m4a`, { type: "audio/mp4" });
+        applyRecordedMeeting(file, blob);
+
+        await submitMeetingRecording();
+      } catch (error) {
+        setStatus(`Не удалось сохранить запись: ${error.message || error}`, "is-error");
+        state.isSubmitting = false;
+        syncButtons();
+      }
+    }
+
+    async function requestPauseMeeting() {
+      if (!state.isRecording || state.isSubmitting) {
+        return;
+      }
+      const Recorder = getRecorderPlugin();
+      if (!Recorder) return;
+
+      try {
+        await Recorder.pause();
+        stopTimer(true);
+        state.isRecording = false;
+        state.isPaused = true;
+        setStatus("Запись поставлена на паузу. Выберите дальнейшее действие.", "is-warning");
+        elements.pauseModal.hidden = false;
+        syncButtons();
+      } catch (error) {
+        setStatus(`Не удалось поставить на паузу: ${error.message || error}`, "is-error");
+      }
+    }
+
+    async function continueMeeting() {
+      elements.pauseModal.hidden = true;
+      const Recorder = getRecorderPlugin();
+      if (!Recorder) return;
+
+      try {
+        await Recorder.resume();
+        state.isRecording = true;
+        state.isPaused = false;
+        startTimer(false);
+        setStatus("Запись встречи продолжена. Идет фиксация аудио с микрофона устройства.", "");
+        syncButtons();
+      } catch (error) {
+        setStatus(`Не удалось продолжить запись: ${error.message || error}`, "is-error");
+      }
+    }
+
+    function openResetConfirm() {
+      elements.pauseModal.hidden = true;
+      elements.resetConfirmModal.hidden = false;
+    }
+
+    function closeResetConfirm() {
+      elements.resetConfirmModal.hidden = true;
+    }
+
+    async function confirmResetMeeting() {
+      elements.resetConfirmModal.hidden = true;
+      const Recorder = getRecorderPlugin();
+      if (Recorder && (state.isRecording || state.isPaused)) {
+        try { await Recorder.stop(); } catch (error) { /* игнорируем — все равно сбрасываем состояние UI */ }
+      }
+      resetRecordedMeeting();
+      setStatus(`Чек-лист <strong>${state.checklistLabel}</strong> найден. Запись сброшена, можно начать встречу заново.`, "is-success");
+    }
+
+    async function submitMeetingRecording() {
+      if (!state.file) {
+        setStatus("Не удалось подготовить запись к отправке. Повторите встречу еще раз.", "is-error");
+        state.isSubmitting = false;
+        syncButtons();
+        return;
+      }
+      if (!state.checklistId) {
+        setStatus(`Не найден чек-лист <strong>${CHECKLIST_NAME}</strong>. Сначала создайте его в основном кабинете.`, "is-warning");
+        state.isSubmitting = false;
+        syncButtons();
+        return;
+      }
+
+      setStatus("Запись отправлена. Идет фоновое распознавание и оценка встречи. Это может занять до пары минут.", "");
+      elements.fileSubnote.textContent = "Страницу можно не трогать: встреча уже отправлена на автоматический анализ.";
+
+      const formData = new FormData();
+      formData.set("checklist_id", state.checklistId);
+      formData.set("comment", "Автоматическая запись встречи (нативная фоновая запись, Android).");
+      formData.set("audio_file", state.file, state.file.name);
+
+      try {
+        const response = await fetch("api.php?action=analyze", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin"
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Не удалось отправить запись на анализ.");
+        }
+
+        setStatus("Встреча успешно отправлена и проанализирована. Результат уже сохранен в разделе результатов оценки.", "is-success");
+        elements.fileNote.textContent = `Готово: ${state.file.name}`;
+        elements.fileSubnote.textContent = "Можно начать новую встречу.";
+        state.file = null;
+        if (state.audioUrl) {
+          URL.revokeObjectURL(state.audioUrl);
+          state.audioUrl = "";
+        }
+        elements.audio.hidden = true;
+        elements.audio.removeAttribute("src");
+        elements.audio.load();
+      } catch (error) {
+        setStatus(error.message, "is-error");
+        elements.fileSubnote.textContent = "Запись сохранена локально на этой странице. При необходимости можно повторить запись.";
+      } finally {
+        state.isSubmitting = false;
+        state.shouldSubmitAfterStop = false;
+        elements.timer.textContent = "00:00";
+        syncButtons();
+      }
+    }
+
+    elements.startBtn.addEventListener("click", startMeetingRecording);
+    elements.stopBtn.addEventListener("click", requestStopMeeting);
+    elements.pauseBtn.addEventListener("click", requestPauseMeeting);
+    elements.confirmYesBtn.addEventListener("click", confirmStopMeeting);
+    elements.confirmNoBtn.addEventListener("click", cancelStopMeeting);
+    elements.pauseContinueBtn.addEventListener("click", continueMeeting);
+    elements.pauseResetBtn.addEventListener("click", openResetConfirm);
+    elements.resetConfirmYesBtn.addEventListener("click", confirmResetMeeting);
+    elements.resetConfirmNoBtn.addEventListener("click", () => {
+      closeResetConfirm();
+      elements.pauseModal.hidden = false;
+    });
+    elements.confirmModal.addEventListener("click", (event) => {
+      if (event.target === elements.confirmModal) cancelStopMeeting();
+    });
+    elements.pauseModal.addEventListener("click", (event) => {
+      if (event.target === elements.pauseModal) continueMeeting();
+    });
+    elements.resetConfirmModal.addEventListener("click", (event) => {
+      if (event.target === elements.resetConfirmModal) {
+        closeResetConfirm();
+        elements.pauseModal.hidden = false;
+      }
+    });
+
+    resetRecordedMeeting({ keepStatus: true });
+    fetchMeetingChecklist().catch((error) => {
+      setStatus(error.message, "is-error");
+      syncButtons();
+    });
+  </script>
+</body>
+</html>

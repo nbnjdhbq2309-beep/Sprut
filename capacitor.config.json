@@ -1,0 +1,11 @@
+{
+  "appId": "com.uniqdev.meetingrecorder",
+  "appName": "Sprut Meeting Recorder",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
